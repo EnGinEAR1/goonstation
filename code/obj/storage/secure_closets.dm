@@ -205,7 +205,7 @@
 	/obj/item/storage/box/lglo_kit/random,
 	/obj/item/clothing/head/det_hat/gadget,
 	/obj/item/device/detective_scanner/detective,
-	/obj/item/bloodtracker,
+	/obj/item/pinpointer/bloodtracker,
 	/obj/item/device/flash,
 	/obj/item/camera_film,
 	/obj/item/storage/box/luminol_grenade_kit)
@@ -561,6 +561,7 @@
 	name = "\improper Engineer's locker"
 	req_access = list(access_engineering_engine)
 	spawn_contents = list(/obj/item/storage/toolbox/mechanical,
+	/obj/item/engivac,
 	/obj/item/storage/box/clothing/engineer,
 	/obj/item/storage/backpack/engineering,
 	/obj/item/clothing/suit/wintercoat/engineering,
@@ -571,7 +572,8 @@
 	/obj/item/pen/infrared,
 	/obj/item/clothing/head/helmet/welding,
 	/obj/item/clothing/suit/hi_vis,
-	/obj/item/lamp_manufacturer/organic)
+	/obj/item/lamp_manufacturer/organic,
+	/obj/item/pinpointer/category/apcs/station)
 
 /obj/storage/secure/closet/engineering/mining
 	name = "\improper Miner's locker"
@@ -637,6 +639,7 @@
 	req_access = list(access_kitchen)
 	spawn_contents = list(/obj/item/storage/box/clothing/chef,\
 	/obj/item/storage/box/clothing/souschef,\
+	/obj/item/clothing/head/chefhatpuffy,\
 	/obj/item/storage/box/cutlery,\
 	/obj/item/kitchen/rollingpin,\
 	/obj/item/paper/book/from_file/cookbook,\
@@ -669,6 +672,8 @@
 	/obj/item/clothing/head/formal_turban,\
 	/obj/item/clothing/head/turban,\
 	/obj/item/clothing/shoes/sandal,\
+	/obj/item/clothing/under/misc/chaplain/nun,\
+	/obj/item/clothing/head/nunhood,\
 	/obj/item/clothing/suit/flockcultist,\
 	/obj/item/storage/box/holywaterkit)
 

@@ -11,7 +11,6 @@
 	opacity = 0
 	layer = 2.6
 	anchored = 1
-	event_handler_flags = USE_HASENTERED
 	plane = PLANE_NOSHADOW_BELOW
 
 	var/obj/machinery/mass_driver/driver = null
@@ -20,10 +19,13 @@
 	var/operating = 0
 	var/driver_operating = 0
 	var/trash = 0
+	/// Amount of time in seconds before connected blast doors should close
+	var/door_delay = 3 // Multiplied by SECONDS on New()
 
 	New()
 		..()
 		SPAWN_DBG(0.5 SECONDS)
+			door_delay = door_delay SECONDS
 			var/list/drivers = new/list()
 			for(var/obj/machinery/mass_driver/D in range(1,src))
 				drivers += D
@@ -40,7 +42,7 @@
 				src.set_dir(get_dir(src,driver))
 
 	proc/activate()
-		if(operating || !isturf(src.loc)) return
+		if(operating || !isturf(src.loc) || driver_operating) return
 		operating = 1
 		flick("launcher_loader_1",src)
 		playsound(src, "sound/effects/pump.ogg",50, 1)
@@ -65,11 +67,11 @@
 						SPAWN_DBG(0)
 							if (door)
 								door.open()
-						SPAWN_DBG(10 SECONDS)
+						SPAWN_DBG(door_delay)
 							if (door)
-								door.close() //this may need some adjusting still
+								door.close()
 
-				SPAWN_DBG(door ? 55 : 20) driver_operating = 0
+				SPAWN_DBG(door ? door_delay : 2 SECONDS) driver_operating = FALSE
 
 				sleep(door ? 20 : 10)
 				if (driver)
@@ -85,7 +87,8 @@
 				break
 			if(drive) activate()
 
-	HasEntered(atom/A)
+	Crossed(atom/movable/A)
+		..()
 		if (istype(A, /mob/dead) || isintangible(A) || iswraith(A)) return
 		return_if_overlay_or_effect(A)
 		activate()
@@ -111,7 +114,7 @@
 	density = 0
 	opacity = 0
 	anchored = 1
-	event_handler_flags = USE_HASENTERED | USE_FLUID_ENTER
+	event_handler_flags = USE_FLUID_ENTER
 	plane = PLANE_NOSHADOW_BELOW
 
 	var/default_direction = NORTH //The direction things get sent into when the router does not have a destination for the given barcode or when there is none attached.
@@ -179,7 +182,8 @@
 				break
 			if(drive) activate()
 
-	HasEntered(atom/A)
+	Crossed(atom/movable/A)
+		..()
 		if (istype(A, /mob/dead) || isintangible(A) || iswraith(A)) return
 
 		if (!trigger_when_no_match)
@@ -260,7 +264,7 @@
 /obj/machinery/cargo_router/Router10 // to outer router -> in
 	New()
 		destinations = list("Airbridge" = WEST, "Cafeteria" = WEST, "EVA" = WEST, "Disposals" = WEST, "QM" = SOUTH, "Engine" = WEST, "Catering" = WEST, "MedSci" = WEST, "Security" = WEST)
-		default_direction = SOUTH
+		default_direction = WEST
 		..()
 
 /obj/machinery/cargo_router/Router11 // outer router -> up
@@ -287,6 +291,11 @@
 		default_direction = EAST
 		..()
 
+/obj/machinery/cargo_router/Router15 // undeliverable cargo outlet
+	New()
+		destinations = list("Airbridge" = WEST, "Cafeteria" = WEST, "EVA" = WEST, "Disposals" = WEST, "QM" = WEST, "Engine" = WEST, "Catering" = WEST, "MedSci" = WEST, "Security" = WEST)
+		default_direction = SOUTH
+		..()
 
 /obj/machinery/cargo_router/oshan_north
 	trigger_when_no_match = 0
@@ -332,18 +341,18 @@
 		dat += "<BR><b><A href='?src=\ref[src];add=1'>Add Tag</A></b>"
 
 		src.add_dialog(user)
-		user.Browse(dat, "title=Barcode Computer;window=bc_computer_[src];size=300x400")
+		user.Browse(dat, "title=Barcode Computer;window=bc_computer_[src];size=300x480")
 		onclose(user, "bc_computer_[src]")
 		return
 
 
-	attackby(var/obj/item/I as obj, user as mob)
+	attackby(var/obj/item/I as obj, mob/user as mob)
 		if (istype(I, /obj/item/card/id) || (istype(I, /obj/item/device/pda2) && I:ID_card))
 			if (istype(I, /obj/item/device/pda2) && I:ID_card) I = I:ID_card
 			boutput(user, "<span class='notice'>You swipe the ID card.</span>")
 			account = FindBankAccountByName(I:registered)
 			if(account)
-				var/enterpin = input(user, "Please enter your PIN number.", "Order Console", 0) as null|num
+				var/enterpin = user.enter_pin("Barcode Computer")
 				if (enterpin == I:pin)
 					boutput(user, "<span class='notice'>Card authorized.</span>")
 					src.scan = I
@@ -363,7 +372,7 @@
 
 		if (href_list["amount"] && !printing)
 			var/amount = input(usr, "How many labels to print?", "[src.name]", 0) as null|num
-			if (!amount || amount < 0) return
+			if (!amount || amount < 0 || !isnum_safe(amount)) return
 			if (amount > 5) amount = 5
 			src.print_amount = amount
 			src.updateUsrDialog()
@@ -399,6 +408,9 @@
 	desc = "Used to print barcode stickers for the cargo routing system, and to mark crates for sale to traders."
 	icon_state = "qm_barcode_comp"
 
+	New()
+		..()
+
 	attack_hand(var/mob/user as mob)
 		if (..(user))
 			return
@@ -416,13 +428,18 @@
 			if (!T.hidden)
 				dat += "<b><A href='?src=\ref[src];print=[T.crate_tag]'>Sell to [T.name]</A></b><BR>"
 
+		dat += "<BR><b>Requisition Fulfillment:</b><BR>"
+		dat += "<b><A href='?src=\ref[src];print=["REQ-THIRDPARTY"]'>REQ-THIRDPARTY</A></b><BR>"
+		for(var/datum/req_contract/RC in shippingmarket.req_contracts)
+			dat += "<b><A href='?src=\ref[src];print=[RC.req_code]'>[RC.req_code]</A></b><BR>"
+
 		//dat += "<BR><b><A href='?src=\ref[src];add=1'>Add Tag</A></b>"
 
 		src.add_dialog(user)
 		// Attempting to diagnose an infinite window refresh I can't duplicate, reverting the display style back to plain HTML to see what results that gets me.
 		// Hooray for having a playerbase to test shit on
-		//user.Browse(dat, "title=Barcode Computer;window=bc_computer_[src];size=300x400")
-		user.Browse(dat, "title=Barcode Computer;window=bc_computer_[src];size=300x400")
+		//user.Browse(dat, "title=Barcode Computer;window=bc_computer_[src];size=300x480")
+		user.Browse(dat, "title=Barcode Computer;window=bc_computer_[src];size=300x480")
 		onclose(user, "bc_computer_[src]")
 		return
 
@@ -468,7 +485,7 @@
 					boutput(user, "<span class='notice'>[target] has been marked with your account routing information.</span>")
 					C.desc = "[C] belongs to [scan.registered]."
 				var/obj/storage/crate/C = target
-				C.update_icon()
+				C.UpdateIcon()
 				qdel(src)
 			else
 				var/pox = src.pixel_x
